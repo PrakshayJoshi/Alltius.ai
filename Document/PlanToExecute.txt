@@ -38,3 +38,4 @@ Index in FAISS (or your vector database of choice).
 RAG Pipeline
 
 At query time: embed question → retrieve top-k chunks → feed those along with the question into the LLM → return the answer (or “I don’t know” if no good match).
+

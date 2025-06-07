@@ -1,11 +1,16 @@
 # rag_chatbot_gemini.py
-
 import os
 import json
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import requests
+
+
+def answer_question(question):
+    chunks = retrieve_chunks(question)
+    answer = generate_answer(question, chunks)
+    return answer
 
 # --- Configuration for FAISS Index and Metadata ---
 # Get absolute path to this script's directory
@@ -228,4 +233,5 @@ if __name__ == "__main__":
         
         response = answer_question(user_input)
         print(f"\nBot: {response}\n")
+        
 
