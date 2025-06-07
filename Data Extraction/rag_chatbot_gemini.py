@@ -5,28 +5,21 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import requests
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
-def answer_question(question):
-    chunks = retrieve_chunks(question)
-    answer = generate_answer(question, chunks)
-    return answer
-
-# --- Configuration for FAISS Index and Metadata ---
-# Get absolute path to this script's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Paths to index and metadata files
 INDEX_PATH = os.path.join(BASE_DIR, "faiss_index.bin")
 META_PATH = os.path.join(BASE_DIR, "faiss_metadata.json")
 
-# Ensure the FAISS index and metadata files exist before attempting to load
 if not os.path.exists(INDEX_PATH) or not os.path.exists(META_PATH):
     print(f"Error: FAISS index '{INDEX_PATH}' or metadata '{META_PATH}' not found.")
     print("Please ensure these files are in the same directory as this script.")
-    exit() # Exit if crucial files are missing
+    exit()
 
-# Load FAISS index and metadata
 try:
     index = faiss.read_index(INDEX_PATH)
     with open(META_PATH, "r") as f:
@@ -34,101 +27,62 @@ try:
     print("FAISS index and metadata loaded successfully.")
 except Exception as e:
     print(f"Error loading FAISS index or metadata: {e}")
-    exit() # Exit if loading fails
+    exit()
 
-# Load the Sentence Transformer model for generating embeddings
 model = SentenceTransformer("all-MiniLM-L6-v2")
 print("Sentence Transformer model 'all-MiniLM-L6-v2' loaded.")
 
-# --- Gemini API Setup ---
-# IMPORTANT: The GEMINI_API_KEY is left as an empty string.
-# In the Canvas environment, this will be automatically provided at runtime for Google services.
+# Load API key from env variable
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("[ERROR] GEMINI_API_KEY not set in environment variables.")
+    exit()
 
-# The API URL for the Gemini 2.0 Flash model's generateContent endpoint
-# We use gemini-2.0-flash as it's optimized for speed and cost.
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
-# Headers for the Gemini API request
-# No 'Authorization' header is needed explicitly if the API key is passed in the URL
-# and handled by the Canvas environment.
 HEADERS = {
     "Content-Type": "application/json"
 }
 print(f"Gemini API URL set to: {GEMINI_API_URL}")
 
 def retrieve_chunks(question, top_k=3):
-    """
-    Retrieves the top_k most relevant text chunks from the FAISS index
-    based on the semantic similarity of the given question.
-
-    Args:
-        question (str): The user's query or question.
-        top_k (int): The number of top relevant chunks to retrieve.
-
-    Returns:
-        list[str]: A list of text strings representing the retrieved chunks.
-    """
     print(f"Retrieving {top_k} chunks for question: '{question}'...")
-    # Encode the question into a vector embedding
     query_embedding = model.encode([question])
+    print("Query embedded successfully.")
     
-    # Perform a similarity search in the FAISS index
-    # The query embedding must be float32
     D, I = index.search(np.array(query_embedding).astype("float32"), top_k)
     
-    # Extract the actual text content of the retrieved chunks using their indices
     chunks = [metadata[i]['text'] for i in I[0]]
     print("Chunks retrieved.")
     return chunks
 
 def generate_answer(question, contexts):
-    """
-    Generates an answer to the question using the Gemini API,
-    based on the provided context chunks.
-
-    Args:
-        question (str): The user's question.
-        contexts (list[str]): A list of retrieved text chunks to serve as context.
-
-    Returns:
-        str: The AI-generated answer, or an error message if the API call fails.
-    """
     context = "\n".join(contexts)
     
-    # Construct the prompt for the Gemini model.
-    # We instruct the model to answer based ONLY on the provided context.
-    # The format uses 'role' and 'parts' as per Gemini API requirements for conversations.
     prompt_text = f"Answer the question based only on the context below. If not in context, say 'I don't know'.\n\nContext:\n{context}\n\nQuestion: {question}\nAnswer:"
     
     payload = {
         "contents": [
             {
-                "role": "user",  # The role for the input prompt
-                "parts": [{"text": prompt_text}] # The content of the prompt
+                "role": "user",
+                "parts": [{"text": prompt_text}]
             }
         ],
         "generationConfig": {
-            # Parameters to control the generation process
-            "temperature": 0.7,       # Controls randomness. Lower for more deterministic, higher for more creative.
-            "maxOutputTokens": 500,   # Max length of the generated response.
-            "topP": 0.9,              # Nucleus sampling: filters tokens based on cumulative probability.
-            "topK": 40                # Top-K sampling: filters tokens to the top K most likely.
+            "temperature": 0.7,
+            "maxOutputTokens": 500,
+            "topP": 0.9,
+            "topK": 40
         }
     }
 
     print(f"Generating answer using Gemini API for question: '{question[:50]}...'")
 
     try:
-        # Send the POST request to the Gemini API
-        response = requests.post(GEMINI_API_URL, headers=HEADERS, json=payload, timeout=30) # Added timeout
-        
-        # Raise an HTTPError for bad status codes (4xx or 5xx)
-        response.raise_for_status() 
-        
-        # Parse the JSON response from Gemini
+        response = requests.post(GEMINI_API_URL, headers=HEADERS, json=payload, timeout=30)
+        response.raise_for_status()
         result = response.json()
 
-        # Extract the generated text from the structured Gemini response
         if result.get("candidates") and len(result["candidates"]) > 0 and \
            result["candidates"][0].get("content") and \
            result["candidates"][0]["content"].get("parts") and \
@@ -139,7 +93,6 @@ def generate_answer(question, contexts):
             print("Answer generated successfully by Gemini.")
             return generated_text
         else:
-            # If the expected structure is not found, log and return an error
             error_details = json.dumps(result, indent=2)
             print(f"Error: Gemini API returned unexpected response format. Details:\n{error_details}")
             return f"[ERROR] Gemini API returned unexpected response. Please check logs for details."
@@ -147,32 +100,18 @@ def generate_answer(question, contexts):
     except requests.exceptions.Timeout:
         return "[ERROR] Gemini API request timed out. Please check your internet connection or try again later."
     except requests.exceptions.RequestException as e:
-        # Catch network errors, invalid URLs, or other API issues
         error_message = f"Error during Gemini API request: {e}"
         if response and hasattr(response, 'text'):
             error_message += f"\nAPI Response: {response.text}"
         print(error_message)
         return f"[ERROR] Failed to connect to Gemini API. Details: {e}"
     except json.JSONDecodeError:
-        # Catch errors if the response is not valid JSON
         return "[ERROR] Could not parse JSON response from Gemini API."
     except Exception as e:
-        # Catch any other unexpected errors
         print(f"An unexpected error occurred in generate_answer: {e}")
         return f"[ERROR] An unexpected error occurred: {e}"
 
 def answer_question(question):
-    """
-    Main function to answer a question using the RAG pipeline:
-    1. Retrieve relevant chunks.
-    2. Generate an answer based on the chunks using Gemini.
-
-    Args:
-        question (str): The user's question.
-
-    Returns:
-        str: The final answer.
-    """
     chunks = retrieve_chunks(question)
     answer = generate_answer(question, chunks)
     return answer
@@ -180,7 +119,7 @@ def answer_question(question):
 if __name__ == "__main__":
     print("--- RAG Chatbot with Gemini 2.0 Flash ---")
     
-    # --- Test API Connectivity with a simple prompt ---
+    # --- Test API Connectivity ---
     print("\nTesting Gemini API connectivity with a simple prompt...")
     test_prompt_text = "Hello, what is your purpose?"
     test_payload = {
@@ -198,7 +137,7 @@ if __name__ == "__main__":
     
     try:
         test_response = requests.post(GEMINI_API_URL, headers=HEADERS, json=test_payload, timeout=15)
-        test_response.raise_for_status() # Will raise HTTPError for bad responses
+        test_response.raise_for_status()
         
         test_result = test_response.json()
         if test_result.get("candidates") and len(test_result["candidates"]) > 0 and \
@@ -223,7 +162,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\nAn unexpected error occurred during API test: {e}")
 
-    # --- Start interactive RAG Chatbot ---
+    # --- Start interactive chatbot ---
     print("\n--- Starting RAG Chatbot ---")
     print("Type 'exit' or 'quit' to end.\n")
     while True:
@@ -233,5 +172,3 @@ if __name__ == "__main__":
         
         response = answer_question(user_input)
         print(f"\nBot: {response}\n")
-        
-
