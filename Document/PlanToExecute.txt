@@ -1,0 +1,40 @@
+Tasks to Do 
+
+I have created an Env: python3 -m venv venv
+Activate Env:- source venv/bin/activate
+then i get the venv:- virtual env
+
+
+
+ Scrape AngelOne support pages     
+ Extract and clean PDF content       
+ Chunk text                         
+ Generate and store embeddings      
+ Implement RAG pipeline             
+ Build chatbot UI                   
+ Host working prototype             
+ Create GitHub repo + README       
+
+
+Next Steps
+Text cleaning
+
+Use regex to strip out page headers/footers and line-break artifacts.
+
+Normalize whitespace (e.g. collapse multiple spaces/newlines).
+
+Chunking
+
+Slide a window of ~250 words (with some overlap, say 50 words) to create “passages.”
+
+Store each passage with metadata: { pdf_filename, chunk_index, text }.
+
+Embedding & Vector Store
+
+Turn each cleaned chunk into an embedding vector.
+
+Index in FAISS (or your vector database of choice).
+
+RAG Pipeline
+
+At query time: embed question → retrieve top-k chunks → feed those along with the question into the LLM → return the answer (or “I don’t know” if no good match).
