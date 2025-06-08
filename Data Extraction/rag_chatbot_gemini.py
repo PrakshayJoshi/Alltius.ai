@@ -51,16 +51,29 @@ def retrieve_chunks(question, top_k=3):
     print("Query embedded successfully.")
     
     D, I = index.search(np.array(query_embedding).astype("float32"), top_k)
-    
-    chunks = [metadata[i]['text'] for i in I[0]]
+
+    chunks = []
+    for i in I[0]:
+        entry = metadata[i]
+        text = entry['text']
+        source = entry.get('source_file', 'unknown_source.json')
+        chunks.append({
+            "text": text,
+            "source": source
+        })
+
     print("Chunks retrieved.")
     return chunks
 
-def generate_answer(question, contexts):
-    context = "\n".join(contexts)
-    
-    prompt_text = f"Answer the question based only on the context below. If not in context, say 'I don't know'.\n\nContext:\n{context}\n\nQuestion: {question}\nAnswer:"
-    
+
+def generate_answer(question, retrieved_chunks):
+    # Format the context with source labels
+    context = ""
+    for chunk in retrieved_chunks:
+        context += f"{chunk['text']}\n(Source: {chunk['source']})\n\n"
+
+    prompt_text = f"Answer the question based only on the context below. If not in context, say 'I don't know'.\n\nContext:\n{context}\nQuestion: {question}\nAnswer:"
+
     payload = {
         "contents": [
             {

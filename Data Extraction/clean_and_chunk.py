@@ -5,6 +5,7 @@ import os
 # Configure input/output paths relative to this script
 SCRIPT_DIR  = os.path.dirname(__file__)
 INPUT_JSON  = os.path.join(SCRIPT_DIR, "insurance_pdfs_data.json")
+QA_JSON     = os.path.join(SCRIPT_DIR, "angelone_qas.json")
 OUTPUT_JSON = os.path.join(SCRIPT_DIR, "insurance_pdfs_chunks.json")
 
 # Chunking parameters
@@ -15,18 +16,12 @@ def clean_text(text: str) -> str:
     """
     Remove page-number artifacts, stray URLs, and normalize whitespace.
     """
-    # Remove '1 of 6', '2 of 6', etc.
     text = re.sub(r'\b\d+\s+of\s+\d+\b', ' ', text)
-    # Remove footnote URLs like 'www.something.com'
     text = re.sub(r'www\.\S+', ' ', text)
-    # Collapse any run of whitespace/newlines into single spaces
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
-    """
-    Split cleaned text into word-based chunks with overlap.
-    """
     words = text.split()
     chunks = []
     start = 0
@@ -43,18 +38,16 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
     return chunks
 
 def main():
-    # Check input JSON exists
+    all_chunks = []
+
+    # Load extracted PDF data
     if not os.path.exists(INPUT_JSON):
         print(f"ERROR: Input file not found: {INPUT_JSON}")
         return
 
-    # Load extracted PDF data
     with open(INPUT_JSON, 'r', encoding='utf-8') as f:
         pdf_docs = json.load(f)
 
-    all_chunks = []
-
-    # Process each PDF document
     for doc in pdf_docs:
         raw = doc.get('content', '')
         cleaned = clean_text(raw)
@@ -67,7 +60,23 @@ def main():
                 "text": passage
             })
 
-    # Write out the chunked data
+    # Load scraped AngelOne Q&A and append
+    if os.path.exists(QA_JSON):
+        with open(QA_JSON, 'r', encoding='utf-8') as f:
+            qas = json.load(f)
+
+        start_idx = len(all_chunks)
+        for i, qa in enumerate(qas):
+            question = qa.get('question', '').strip()
+            answer = qa.get('answer', '').strip()
+            if question and answer:
+                all_chunks.append({
+                    "source_file": "angelone_qas.json",
+                    "chunk_index": start_idx + i,
+                    "text": f"Q: {question}\nA: {answer}"
+                })
+
+    # Save combined chunks
     with open(OUTPUT_JSON, 'w', encoding='utf-8') as f:
         json.dump(all_chunks, f, ensure_ascii=False, indent=2)
 
