@@ -3,7 +3,7 @@ import json
 import fitz  # PyMuPDF
 
 def extract_text_from_pdfs(pdf_folder: str):
-    """Reads all PDFs in a folder and returns a list of dicts with filename and content."""
+
     data = []
 
     for fname in os.listdir(pdf_folder):
@@ -15,7 +15,6 @@ def extract_text_from_pdfs(pdf_folder: str):
         text_chunks = []
 
         for page in doc:
-            # get_text("text") returns the plain text of the page
             text = page.get_text("text")
             if text.strip():
                 text_chunks.append(text.strip())

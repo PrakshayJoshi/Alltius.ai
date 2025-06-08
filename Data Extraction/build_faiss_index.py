@@ -3,13 +3,12 @@ import os
 import faiss
 from sentence_transformers import SentenceTransformer
 
-# Paths
 SCRIPT_DIR        = os.path.dirname(__file__)
 CHUNKS_JSON       = os.path.join(SCRIPT_DIR, "insurance_pdfs_chunks.json")
 FAISS_INDEX_PATH  = os.path.join(SCRIPT_DIR, "faiss_index.bin")
 METADATA_PATH     = os.path.join(SCRIPT_DIR, "faiss_metadata.json")
 
-# Model
+
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # small & performant
 
 def main():

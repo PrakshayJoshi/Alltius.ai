@@ -1,0 +1,76 @@
+step-by-step technical documentation of everything I've done so far:
+
+AI Chatbot with FastAPI Backend and Frontend
+
+This project implements a Retrieval-Augmented Generation (RAG) chatbot using Gemini via a FastAPI backend, and a React-based frontend interface.
+
+1. Data Preparation and FAISS Indexing
+
+Files: In folder Data Extraction --> Json
+
+`insurance_pdfs_data.json`
+`angelone_qas.json`
+
+Steps:
+
+Chunked relevant content from the above files.
+Embedded the chunks using `sentence-transformers` (`all-MiniLM-L6-v2`).
+Built a FAISS index from the embeddings.
+Saved the index as `faiss_index.bin` and the corresponding metadata as `faiss_metadata.json`.
+
+2. RAG Chatbot Backend (`rag_chatbot_gemini.py`)
+
+Components:
+
+Loaded the FAISS index and metadata.
+Encoded the incoming query using the same embedding model.
+Performed a top-K search in the FAISS index.
+Passed retrieved chunks as context to Gemini 2.0 Flash API.
+Used the Gemini API to generate a response based only on retrieved context.
+Returned the final answer or a fallback message if context was insufficient.
+
+API:
+
+`GEMINI_API_KEY` and related config loaded from `.env`.
+ Handled common API error scenarios such as timeouts, missing keys, and unexpected responses.
+
+
+3. FastAPI Server (`main.py`)
+
+Created a simple POST endpoint:
+
+`POST /ask` takes a JSON body with `query` field.
+Calls `answer_question()` function from `rag_chatbot_gemini.py`.
+Returns the chatbot response.
+
+Included CORS middleware to allow frontend access from `http://localhost:3000`.
+
+Port set to `8001` to avoid conflict with frontend.
+
+Start server using:
+
+```bash
+uvicorn main:app --reload --port 8001
+```
+4. Frontend Chat Interface (React + TypeScript)
+
+Implemented a minimal chat UI with:
+
+
+Displayed response from backend dynamically in chat window.
+
+5. Localhost Setup and Testing
+
+ Backend runs on: `http://localhost:8001`
+ Frontend runs on: `http://localhost:8000`
+
+Verified end-to-end flow:
+
+  User inputs query.
+  Query hits FastAPI endpoint.
+  FastAPI fetches top relevant chunks from FAISS.
+  Sends them to Gemini API.
+  Returns response to frontend.
+  Frontend displays final output.
+
+

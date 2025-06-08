@@ -2,20 +2,15 @@ import json
 import re
 import os
 
-# Configure input/output paths relative to this script
 SCRIPT_DIR  = os.path.dirname(__file__)
 INPUT_JSON  = os.path.join(SCRIPT_DIR, "insurance_pdfs_data.json")
 QA_JSON     = os.path.join(SCRIPT_DIR, "angelone_qas.json")
 OUTPUT_JSON = os.path.join(SCRIPT_DIR, "insurance_pdfs_chunks.json")
 
-# Chunking parameters
 CHUNK_SIZE    = 250  # target words per chunk
 CHUNK_OVERLAP = 50   # overlap words between chunks
 
 def clean_text(text: str) -> str:
-    """
-    Remove page-number artifacts, stray URLs, and normalize whitespace.
-    """
     text = re.sub(r'\b\d+\s+of\s+\d+\b', ' ', text)
     text = re.sub(r'www\.\S+', ' ', text)
     text = re.sub(r'\s+', ' ', text)
@@ -40,7 +35,6 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
 def main():
     all_chunks = []
 
-    # Load extracted PDF data
     if not os.path.exists(INPUT_JSON):
         print(f"ERROR: Input file not found: {INPUT_JSON}")
         return
@@ -60,7 +54,6 @@ def main():
                 "text": passage
             })
 
-    # Load scraped AngelOne Q&A and append
     if os.path.exists(QA_JSON):
         with open(QA_JSON, 'r', encoding='utf-8') as f:
             qas = json.load(f)

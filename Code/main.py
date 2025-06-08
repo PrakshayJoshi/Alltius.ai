@@ -1,4 +1,3 @@
-# main.py
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -8,7 +7,6 @@ import logging
 
 app = FastAPI()
 
-# CORS: Allow your frontend domain explicitly in production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # TODO: Replace with actual origin 

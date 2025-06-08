@@ -1,70 +1,86 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from bs4 import BeautifulSoup
-import time
 import json
+import requests
+from bs4 import BeautifulSoup
+from collections import deque
+from urllib.parse import urljoin, urlparse
 
-# --- setup driver ---
-options = webdriver.ChromeOptions()
-options.add_argument("--headless")
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+BASE_URL = "https://www.angelone.in/support"
 
-# --- load support page ---
-start_url = "https://www.angelone.in/support"
-driver.get(start_url)
-time.sleep(5)  # let the JS render
+def is_web_url(url):
+    scheme = urlparse(url).scheme
+    return scheme in ("http", "https")
 
-soup = BeautifulSoup(driver.page_source, "html.parser")
+def discover_support_pages(start_url):
+    seen = set()
+    queue = deque([start_url])
 
+    while queue:
+        url = queue.popleft()
+        if url in seen:
+            continue
+        seen.add(url)
 
-quick_section = soup.find("h6", string=lambda t: t and "Quick Links" in t)
-if not quick_section:
-    raise RuntimeError("Couldn't find the Quick Links header!")
-container = quick_section.find_next_sibling("ul")  # assume the list is next
+        try:
+            resp = requests.get(url)
+            resp.raise_for_status()
+        except Exception:
+            continue  # skip unfetchable URLs
 
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a in soup.find_all("a", href=True):
+            full = urljoin(start_url, a["href"])
+            if (
+                "support" in full.lower()
+                and full not in seen
+                and is_web_url(full)
+            ):
+                queue.append(full)
 
-learn_more_anchors = soup.find_all(
-    "a",
-    string=lambda txt: txt and "Learn More" in txt
-)
+    return seen - {start_url}
 
-all_links = []
-for a in learn_more_anchors:
-    href = a.get("href")
-    if not href or href.startswith("javascript"):
-        continue
-    # normalize to absolute
-    if href.startswith("/"):
-        href = "https://www.angelone.in" + href
-    elif not href.startswith("http"):
-        href = "https://www.angelone.in/" + href
-    if href not in all_links:
-        all_links.append(href)
-
-print(f"Found {len(all_links)} article URLs")
-
-
-# --- fetch each article’s content ---
-support_data = []
-for link in all_links:
+def scrape_faq_page(url):
     try:
-        print("Visiting", link)
-        driver.get(link)
-        time.sleep(3)
-        page = BeautifulSoup(driver.page_source, "html.parser")
-        title = page.find("h1").get_text(strip=True) if page.find("h1") else page.title.string
-        # collect the main body text (e.g. all <p> under the article)
-        content = "\n".join(p.get_text(strip=True)
-                            for p in page.select("article p") if p.get_text(strip=True))
-        support_data.append({"url": link, "title": title, "content": content})
-    except Exception as e:
-        print(f"  → skipped {link}: {e}")
+        resp = requests.get(url)
+        resp.raise_for_status()
+    except Exception:
+        return []  # skip this page entirely on error
 
-driver.quit()
+    soup = BeautifulSoup(resp.text, "html.parser")
+    faqs = []
+    for section in soup.find_all("div", class_="tab"):
+        label = section.find("label", class_="tab-label")
+        q_span = label.find("span") if label else None
+        question = q_span.get_text(strip=True) if q_span else None
 
-# --- save to JSON ---
-with open("angelone_support_articles.json", "w", encoding="utf-8") as f:
-    json.dump(support_data, f, ensure_ascii=False, indent=2)
+        content_div = section.find("div", class_="tab-content")
+        answer = content_div.get_text(" ", strip=True) if content_div else None
 
-print("Done. Articles saved:", len(support_data))
+        if question and answer:
+            faqs.append({"question": question, "answer": answer})
+
+    return faqs
+
+def main():
+    english_faqs = []
+    hindi_faqs = []
+
+    support_pages = discover_support_pages(BASE_URL)
+    for page in support_pages:
+        faqs = scrape_faq_page(page)
+        if "hindi" in page.lower():
+            hindi_faqs.extend(faqs)
+        else:
+            english_faqs.extend(faqs)
+
+    # Write out to JSON files
+    with open("english_faqs.json", "w", encoding="utf-8") as f_en:
+        json.dump(english_faqs, f_en, ensure_ascii=False, indent=2)
+
+    with open("hindi_faqs.json", "w", encoding="utf-8") as f_hi:
+        json.dump(hindi_faqs, f_hi, ensure_ascii=False, indent=2)
+
+    print(f"Saved {len(english_faqs)} English FAQs to english_faqs.json")
+    print(f"Saved {len(hindi_faqs)} Hindi FAQs to hindi_faqs.json")
+
+if __name__ == "__main__":
+    main()

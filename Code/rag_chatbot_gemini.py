@@ -7,19 +7,18 @@ from sentence_transformers import SentenceTransformer
 import requests
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INDEX_PATH = os.path.join(BASE_DIR, "faiss_index.bin")
 META_PATH = os.path.join(BASE_DIR, "faiss_metadata.json")
 
-# Globals (lazy-loaded)
+
 _index = None
 _metadata = None
 _model = None
 
-# Load Gemini API key
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise RuntimeError("[ERROR] GEMINI_API_KEY not set in environment variables.")
