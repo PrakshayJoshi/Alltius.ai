@@ -1,17 +1,18 @@
 # main.py
-from fastapi import FastAPI, Request, HTTPException
+
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from rag_chatbot_gemini import answer_question
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 app = FastAPI()
 
-# If you're calling this from frontend
+# CORS: Allow your frontend domain explicitly in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend origin for security
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],  # TODO: Replace with actual origin 
+    allow_methods=["POST"],
     allow_headers=["*"],
 )
 
@@ -20,12 +21,12 @@ class Query(BaseModel):
 
 @app.post("/ask")
 async def ask_question(q: Query):
+    if not q.query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
     try:
-        if not q.query.strip():
-            raise HTTPException(status_code=400, detail="Query cannot be empty.")
-        
         answer = answer_question(q.query)
         return {"question": q.query, "answer": answer}
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.exception("Error answering question")
+        raise HTTPException(status_code=500, detail="Internal server error")

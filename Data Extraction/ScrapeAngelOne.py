@@ -17,15 +17,13 @@ time.sleep(5)  # let the JS render
 
 soup = BeautifulSoup(driver.page_source, "html.parser")
 
-# --- find the Quick Links container (by its heading) ---
-#    We look for the section titled “Quick Links (10)”
+
 quick_section = soup.find("h6", string=lambda t: t and "Quick Links" in t)
 if not quick_section:
     raise RuntimeError("Couldn't find the Quick Links header!")
 container = quick_section.find_next_sibling("ul")  # assume the list is next
 
-# --- collect all the 'Learn More' anchors under that container ---
-# after loading start_url and soup = BeautifulSoup(…)
+
 learn_more_anchors = soup.find_all(
     "a",
     string=lambda txt: txt and "Learn More" in txt

@@ -12,7 +12,7 @@ METADATA_PATH    = os.path.join(SCRIPT_DIR, "faiss_metadata.json")
 EMBEDDING_MODEL  = "all-MiniLM-L6-v2"
 
 def load_resources():
-    """Load FAISS index, metadata, and embedding model."""
+    
     # 1. Load index
     if not os.path.exists(INDEX_PATH):
         raise FileNotFoundError(f"FAISS index not found at {INDEX_PATH}")
